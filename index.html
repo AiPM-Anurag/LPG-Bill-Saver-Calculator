@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Smart Helper | Hyderabad</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; background: radial-gradient(circle at top right, #1e293b, #0f172a); color: white; overflow-x: hidden; scroll-behavior: smooth; }
+        .glass-card { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; }
+        .glass-card.interactive:hover, .glass-card.selected { transform: translateY(-4px); border-color: rgba(96, 165, 250, 0.5); background: rgba(30, 41, 59, 0.7); }
+        .urgency-btn.selected { background: rgba(59, 130, 246, 0.2); border-color: #3b82f6; color: white; }
+        .urgency-btn.selected-urgent { background: rgba(239, 68, 68, 0.2); border-color: #ef4444; color: #f87171; box-shadow: inset 0 0 15px rgba(239, 68, 68, 0.2); }
+        .gradient-text { background: linear-gradient(135deg, #60a5fa, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .pulse-urgent { animation: pulseRed 1.5s infinite; }
+        @keyframes pulseRed { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.8); } 70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+        .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
+        .step-container { max-height: 0; opacity: 0; overflow: hidden; transition: max-height 0.8s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.6s ease-in-out; }
+        .step-container.active { max-height: 4000px; opacity: 1; margin-top: 2rem; overflow: visible; }
+        #order-modal { backdrop-filter: blur(8px); background: rgba(15, 23, 42, 0.85); }
+        input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=range] { accent-color: #3b82f6; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-10 px-4 relative">
+
+    <div id="app" class="w-full max-w-lg relative pb-20">
+        
+        <div class="text-center mb-8">
+            <i data-lucide="layers" class="w-12 h-12 mx-auto text-blue-400 mb-4"></i>
+            <h1 class="text-4xl font-black tracking-tight gradient-text" data-i18n="title">Local Smart Helper</h1>
+            <p class="text-slate-400 mt-2 text-sm" data-i18n="subtitle">Powered by Hanshly Technologies </p>
+        </div>
+
+        <div id="step-lang" class="space-y-4">
+            <div class="grid grid-cols-3 gap-3">
+                <button onclick="setLanguage('en', this)" class="lang-btn glass-card interactive py-4 rounded-2xl font-semibold text-sm">English</button>
+                <button onclick="setLanguage('te', this)" class="lang-btn glass-card interactive py-4 rounded-2xl font-semibold text-sm">తెలుగు</button>
+                <button onclick="setLanguage('hi', this)" class="lang-btn glass-card interactive py-4 rounded-2xl font-semibold text-sm">हिंदी</button>
+            </div>
+        </div>
+
+        <div id="step-user-type" class="step-container space-y-4">
+            <h2 class="text-xl font-bold text-center mb-4" data-i18n="selectType">Smart Energy Audit: Usage Type</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="setUserType('home', this)" class="type-btn glass-card interactive p-6 rounded-3xl flex flex-col items-center gap-3">
+                    <div class="p-3 bg-blue-500/10 rounded-full text-blue-400"><i data-lucide="home" class="w-8 h-8"></i></div>
+                    <span class="font-semibold text-sm text-center" data-i18n="home">Home Purpose</span>
+                </button>
+                <button onclick="setUserType('commercial', this)" class="type-btn glass-card interactive p-6 rounded-3xl flex flex-col items-center gap-3">
+                    <div class="p-3 bg-purple-500/10 rounded-full text-purple-400"><i data-lucide="chef-hat" class="w-8 h-8"></i></div>
+                    <span class="font-semibold text-sm text-center" data-i18n="commercial">Commercial</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="step-calc" class="step-container glass-card p-8 rounded-3xl space-y-6">
+            <div class="bg-blue-900/20 border border-blue-500/20 p-4 rounded-xl flex gap-3 items-start">
+                <i data-lucide="lightbulb" class="w-5 h-5 text-yellow-400 shrink-0 mt-0.5"></i>
+                <p id="dyk-banner" class="text-xs text-blue-200 leading-relaxed font-medium transition-opacity duration-300"></p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-slate-300 mb-3" data-i18n="cylPrompt">Cylinders per month?</label>
+                <div class="relative">
+                    <input type="number" id="cyl-input" class="w-full bg-slate-900/50 border border-slate-700 rounded-xl p-4 pl-12 text-2xl font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="0">
+                    <i data-lucide="flame" class="absolute left-4 top-1/2 -translate-y-1/2 text-orange-500"></i>
+                </div>
+            </div>
+
+            <div id="comm-followup" class="hidden space-y-6 border-t border-slate-700/50 pt-5">
+                <div id="urgency-container" class="transition-all duration-300 rounded-xl p-2 -mx-2">
+                    <label class="block text-sm font-semibold text-slate-300 mb-3 flex justify-between items-center">
+                        <span data-i18n="urgencyPrompt">Business Urgency <span class="text-red-400">*</span></span>
+                        <span id="urgency-error" class="text-xs text-red-400 font-bold hidden">Required</span>
+                    </label>
+                    <div class="flex flex-col gap-2">
+                        <button onclick="setUrgency('exploring', this)" class="urgency-btn glass-card interactive p-3 rounded-xl text-sm font-medium text-slate-300 border border-slate-700/50 text-left" data-i18n="optExplore">Just exploring options</button>
+                        <button onclick="setUrgency('immediate', this)" class="urgency-btn glass-card interactive p-3 rounded-xl text-sm font-bold text-red-400 border border-red-500/30 text-left" data-i18n="optUrgent">IMMEDIATE SOLUTION NEEDED</button>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="performAudit()" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 p-4 rounded-xl font-bold transition-all shadow-lg shadow-blue-500/25 flex justify-center items-center gap-2">
+                <i data-lucide="calculator" class="w-5 h-5"></i> <span data-i18n="btnCalc">Calculate Savings</span>
+            </button>
+        </div>
+
+        <div id="step-quiz" class="step-container space-y-6">
+            <div class="glass-card p-8 rounded-3xl text-center border-t-4 border-t-green-500 relative">
+                
+                <div id="comm-warning" class="hidden absolute -top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[10px] font-black tracking-widest uppercase px-4 py-1 rounded-full shadow-lg pulse-urgent">
+                    High Overhead Risk
+                </div>
+
+                <p class="text-slate-400 uppercase tracking-widest text-xs font-bold mb-2 pt-2" data-i18n="wastedText">Annual Money Wasted</p>
+                <h3 id="savings-amount" class="text-5xl font-black text-green-400 mb-3 tracking-tighter">₹0</h3>
+                <p id="pivot-msg" class="text-slate-300 text-sm font-medium px-4 mb-6">Stop burning money. Let's find an induction stove that fits your needs.</p>
+                
+                <div id="route-pdf" class="hidden border-t border-slate-700 pt-6">
+                    <button onclick="generatePDF()" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 p-4 rounded-xl font-bold flex justify-center items-center gap-2">
+                        <i data-lucide="file-down" class="w-5 h-5 text-slate-300"></i> Download Audit Report
+                    </button>
+                </div>
+
+                <div id="route-quiz" class="hidden text-left space-y-5 border-t border-slate-700 pt-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-300 mb-2">How many burners do you need?</label>
+                        <select id="quiz-burners" class="w-full bg-slate-900/50 border border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none appearance-none">
+                            <option value="Any">Any / Doesn't Matter</option>
+                            <option value="1">1 Burner</option>
+                            <option value="2">2 Burners</option>
+                            <option value="3">3+ Burners</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-300 mb-2 flex justify-between">
+                            <span>Max Budget:</span> <span id="budget-display" class="text-blue-400 font-bold">₹8,000</span>
+                        </label>
+                        <input type="range" id="quiz-budget" min="1500" max="30000" step="500" value="8000" class="w-full" oninput="document.getElementById('budget-display').innerText = '₹' + this.value.toLocaleString('en-IN')">
+                    </div>
+                    <button onclick="fetchAndRenderCatalog()" class="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 p-4 rounded-xl font-bold transition-all shadow-lg shadow-green-500/25 flex justify-center items-center gap-2">
+                        <i data-lucide="search" class="w-5 h-5"></i> Find My Match
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="step-catalog" class="step-container space-y-6">
+            <h2 class="text-2xl font-black text-center mb-6 gradient-text">Recommended Inventory</h2>
+            <div id="catalog-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            <div id="catalog-loading" class="hidden text-center py-10">
+                <i data-lucide="loader-2" class="w-8 h-8 animate-spin mx-auto text-blue-500 mb-3"></i>
+                <p class="text-slate-400 text-sm">Searching distributor inventory...</p>
+            </div>
+        </div>
+
+    </div>
+
+    <a href="https://wa.me/918106061534?text=Hi!%20I%20need%20help%20from%20the%20Local%20Smart%20Helper%20(LPG%20Audit,%20Kirana,%20etc.)" target="_blank" class="fixed bottom-6 right-6 bg-[#25D366] text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-transform flex items-center justify-center z-40">
+        <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/></svg>
+    </a>
+
+    <div id="order-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="glass-card w-full max-w-md p-6 rounded-3xl relative">
+            <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+            <h3 class="text-xl font-bold mb-1">Reserve Product</h3>
+            <p id="modal-product-name" class="text-blue-400 text-sm font-semibold mb-6">Product Name</p>
+            <div class="space-y-4">
+                <input type="text" id="order-name" class="w-full bg-slate-900/50 border border-slate-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Full Name">
+                <input type="tel" id="order-phone" class="w-full bg-slate-900/50 border border-slate-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Phone Number">
+                <textarea id="order-address" rows="2" class="w-full bg-slate-900/50 border border-slate-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Delivery Address"></textarea>
+                <button onclick="submitOrder()" class="w-full bg-[#25D366] hover:bg-[#1da851] text-white p-4 rounded-xl font-bold flex justify-center items-center gap-2">Send Order via Smart Helper</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        
+        const config = { 
+            wa_num: "918106061534", 
+            csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vT4rOiMo3JaurVLbyda-FBq10mbTBVSJVcEj6Zz8hy4gwKvR-0x7Q52WH7Qr4MqLsVgrSH02xNmZ13X/pub?output=csv"
+        };
+
+        const i18n = {
+            en: { title: "Local Smart Helper", subtitle: "LPG Audit, Kirana & More • Hyderabad", selectType: "Smart Energy Audit: Usage Type", home: "Home Purpose", commercial: "Commercial", cylPrompt: "Cylinders per month?", urgencyPrompt: "Business Urgency", optExplore: "Just exploring options", optUrgent: "IMMEDIATE SOLUTION NEEDED", btnCalc: "Calculate Savings", wastedText: "Annual Money Wasted" },
+            te: { title: "లోకల్ స్మార్ట్ హెల్పర్", subtitle: "LPG ఆడిట్, కిరాణా & మరిన్ని • హైదరాబాద్", selectType: "వినియోగ రకాన్ని ఎంచుకోండి", home: "గృహ అవసరాలకు", commercial: "వ్యాపార అవసరాలకు", cylPrompt: "నెలకు ఎన్ని సిలిండర్లు?", urgencyPrompt: "వ్యాపార ఆవశ్యకత", optExplore: "కేవలం అన్వేషిస్తున్నాను", optUrgent: "తక్షణ పరిష్కారం కావాలి", btnCalc: "స్మార్ట్ ఆడిట్ రూపొందించండి", wastedText: "వృధా అవుతున్న డబ్బు" },
+            hi: { title: "लोकल स्मार्ट हेल्पर", subtitle: "एलपीजी ऑडिट, किराना और अधिक • हैदराबाद", selectType: "उपयोग प्रकार चुनें", home: "घरेलू उपयोग", commercial: "व्यावसायिक उपयोग", cylPrompt: "प्रति माह कितने सिलेंडर?", urgencyPrompt: "व्यावसायिक तात्कालिकता", optExplore: "केवल विकल्प खोज रहा हूँ", optUrgent: "तत्काल समाधान चाहिए", btnCalc: "बचत की गणना करें", wastedText: "बर्बाद हुआ पैसा" }
+        };
+
+        const dykFacts = [
+            "Fact: Induction cooktops offer approx 85% thermal efficiency, compared to 40% for gas.",
+            "Fact: 1 kg of LPG contains ~13.6 kWh of energy, but mostly heats the air, not the pan.",
+            "Fact: Switching to induction significantly reduces kitchen AC and ventilation costs."
+        ];
+
+        let state = { lang: 'en', type: null, urgency: null, cylinders: 0, savings: 0, products: [], selectedProduct: null };
+        let dykInterval;
+
+        function parseImageLink(url) {
+            if (!url || url.trim() === '') {
+                return 'https://via.placeholder.com/300x200/1e293b/ffffff?text=No+Image';
+            }
+            if (url.includes('drive.google.com')) {
+                const match = url.match(/[-\w]{25,}/);
+                if (match && match[0]) {
+                    return `https://drive.google.com/uc?export=view&id=${match[0]}`;
+                }
+            }
+            return url; 
+        }
+
+        function setLanguage(lang, btnElement) {
+            state.lang = lang;
+            document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('selected', 'border-blue-500'));
+            btnElement.classList.add('selected', 'border-blue-500');
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if(i18n[lang][key]) el.innerHTML = i18n[lang][key];
+            });
+            const nextStep = document.getElementById('step-user-type');
+            nextStep.classList.add('active');
+            setTimeout(() => nextStep.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+        }
+
+        function setUserType(type, btnElement) {
+            state.type = type;
+            document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('selected', 'border-blue-500'));
+            btnElement.classList.add('selected', 'border-blue-500');
+
+            const commSection = document.getElementById('comm-followup');
+            if(type === 'commercial') {
+                commSection.classList.remove('hidden');
+            } else {
+                commSection.classList.add('hidden');
+                state.urgency = null;
+            }
+
+            const nextStep = document.getElementById('step-calc');
+            nextStep.classList.add('active');
+            
+            const banner = document.getElementById('dyk-banner');
+            banner.innerText = dykFacts[0];
+            let i = 1;
+            clearInterval(dykInterval);
+            dykInterval = setInterval(() => {
+                banner.style.opacity = 0;
+                setTimeout(() => { banner.innerText = dykFacts[i % dykFacts.length]; banner.style.opacity = 1; i++; }, 300);
+            }, 5000);
+            
+            setTimeout(() => nextStep.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+        }
+
+        function setUrgency(val, btnElement) {
+            state.urgency = val;
+            const container = document.getElementById('urgency-container');
+            container.classList.remove('shake', 'bg-red-900/20');
+            document.getElementById('urgency-error').classList.add('hidden');
+            document.querySelectorAll('.urgency-btn').forEach(b => b.classList.remove('selected', 'selected-urgent'));
+            if(val === 'immediate') btnElement.classList.add('selected-urgent');
+            else btnElement.classList.add('selected');
+        }
+
+        function performAudit() {
+            const cyl = document.getElementById('cyl-input').value;
+            if(!cyl || cyl <= 0) return;
+
+            if(state.type === 'commercial' && !state.urgency) {
+                const container = document.getElementById('urgency-container');
+                document.getElementById('urgency-error').classList.remove('hidden');
+                container.classList.add('bg-red-900/20', 'shake');
+                setTimeout(() => container.classList.remove('shake'), 500);
+                return;
+            }
+
+            state.cylinders = parseFloat(cyl);
+            const lpgPrice = state.type === 'home' ? 855 : 2105;
+            const kwhEq = state.type === 'home' ? 81 : 108;
+            
+            state.savings = Math.max(0, Math.round((state.cylinders * 12 * lpgPrice) - (state.cylinders * 12 * kwhEq * 9.50)));
+            document.getElementById('savings-amount').innerText = "₹" + state.savings.toLocaleString('en-IN');
+            
+            const warning = document.getElementById('comm-warning');
+            const routePdf = document.getElementById('route-pdf');
+            const routeQuiz = document.getElementById('route-quiz');
+            const msg = document.getElementById('pivot-msg');
+
+            warning.classList.add('hidden');
+            routePdf.classList.add('hidden');
+            routeQuiz.classList.add('hidden');
+
+            if (state.type === 'commercial') {
+                warning.classList.remove('hidden');
+                
+                if(state.urgency === 'exploring') {
+                    msg.innerText = "Here is your money-saving analysis. Download your report.";
+                    routePdf.classList.remove('hidden');
+                } else {
+                    msg.innerText = "🚨 URGENT: Your business is bleeding capital. Let's fix this.";
+                    routeQuiz.classList.remove('hidden');
+                }
+            } else {
+                msg.innerText = "Stop burning money. Let's find an induction stove that fits your needs.";
+                routeQuiz.classList.remove('hidden');
+            }
+
+            const nextStep = document.getElementById('step-quiz');
+            nextStep.classList.add('active');
+            setTimeout(() => nextStep.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+        }
+
+        function fetchAndRenderCatalog() {
+            const catalogStep = document.getElementById('step-catalog');
+            const loading = document.getElementById('catalog-loading');
+            const grid = document.getElementById('catalog-grid');
+            
+            catalogStep.classList.add('active');
+            loading.classList.remove('hidden');
+            grid.innerHTML = "";
+            setTimeout(() => catalogStep.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+
+            Papa.parse(config.csvUrl, {
+                download: true, header: true, skipEmptyLines: true,
+                complete: function(results) {
+                    state.products = results.data;
+                    filterAndDisplayProducts();
+                }
+            });
+        }
+
+        function filterAndDisplayProducts() {
+            const loading = document.getElementById('catalog-loading');
+            const grid = document.getElementById('catalog-grid');
+            const reqBurners = document.getElementById('quiz-burners').value;
+            const maxBudget = parseFloat(document.getElementById('quiz-budget').value);
+
+            const filteredProducts = state.products.filter(item => {
+                if(!item.Product_ID) return false;
+                if(item.Category && item.Category.toLowerCase() !== state.type.toLowerCase()) return false;
+                if(parseFloat(item.Price) > maxBudget) return false;
+                if(reqBurners !== "Any" && item.Burners !== reqBurners) return false;
+                
+                const stock = item.In_Stock ? item.In_Stock.toLowerCase().trim() : '';
+                if(stock === 'no' || stock === 'false') return false; 
+
+                return true;
+            });
+
+            loading.classList.add('hidden');
+            grid.innerHTML = "";
+
+            if(filteredProducts.length === 0) {
+                grid.innerHTML = `<p class="col-span-full text-center p-6 text-slate-400">No exact matches under budget. Try adjusting sliders.</p>`;
+                return;
+            }
+
+            filteredProducts.forEach(product => {
+                const imgUrl = parseImageLink(product.Image_URL); 
+                const card = document.createElement('div');
+                card.className = "glass-card rounded-2xl overflow-hidden flex flex-col justify-between";
+                card.innerHTML = `
+                    <div>
+                        <div class="h-40 w-full bg-slate-800 relative">
+                            <img src="${imgUrl}" alt="${product.Model_Name}" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='https://via.placeholder.com/300x200/1e293b/ffffff?text=Image+Unavailable';">
+                        </div>
+                        <div class="p-4">
+                            <h4 class="font-bold text-lg leading-tight mb-1">${product.Brand} ${product.Model_Name}</h4>
+                            <div class="flex gap-2 items-baseline mb-3">
+                                <span class="text-2xl font-black text-green-400">₹${parseInt(product.Price).toLocaleString('en-IN')}</span>
+                            </div>
+                            <p class="text-xs text-slate-300 italic">"${product.Review_Summary || 'Great product.'}"</p>
+                        </div>
+                    </div>
+                    <div class="p-4 pt-0">
+                        <button onclick="openModal('${product.Product_ID}', '${product.Brand} ${product.Model_Name}', ${product.Price})" class="w-full bg-slate-800 hover:bg-blue-600 p-3 rounded-xl font-bold transition-colors">Order Now</button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function openModal(id, name, price) {
+            state.selectedProduct = { id, name, price };
+            document.getElementById('modal-product-name').innerText = `${name}`;
+            document.getElementById('order-modal').classList.remove('hidden');
+        }
+
+        function closeModal() { document.getElementById('order-modal').classList.add('hidden'); }
+
+        function submitOrder() {
+            const name = document.getElementById('order-name').value;
+            const phone = document.getElementById('order-phone').value;
+            if(!name || !phone) return alert("Name and Phone required.");
+            const msg = `🛒 *NEW ORDER VIA SMART HELPER*\n\n*Name:* ${name}\n*Phone:* ${phone}\n*Product:* ${state.selectedProduct.name}\n*Price:* ₹${state.selectedProduct.price}`;
+            window.open(`https://wa.me/${config.wa_num}?text=${encodeURIComponent(msg)}`, '_blank');
+            closeModal();
+        }
+
+        function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.setFillColor(15, 23, 42); doc.rect(0, 0, 210, 297, 'F');
+            doc.setTextColor(255, 255, 255); doc.setFontSize(22);
+            doc.text("Energy Efficiency Audit", 20, 30);
+            doc.setFontSize(14); doc.setTextColor(239, 68, 68);
+            doc.text(`MONEY WASTED: Rs. ${state.savings.toLocaleString('en-IN')} / Year`, 20, 60);
+            
+            doc.setTextColor(37, 211, 102); 
+            doc.setFontSize(14);
+            doc.textWithLink('>>> CLICK HERE TO CHAT ON WHATSAPP <<<', 20, 100, { url: `https://wa.me/${config.wa_num}?text=Hi!%20I%20need%20help%20from%20the%20Local%20Smart%20Helper.` });
+            
+            doc.save(`Audit_${new Date().getTime()}.pdf`);
+        }
+    </script>
+</body>
+</html>
